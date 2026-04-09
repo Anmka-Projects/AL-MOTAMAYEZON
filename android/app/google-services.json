@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "171033213171",
+    "project_id": "al-motamizon",
+    "storage_bucket": "al-motamizon.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:171033213171:android:c29a1ff5aeb67c49b65f86",
+        "android_client_info": {
+          "package_name": "com.anmka.elmotamizon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrz0j1_DjDVaLbTCuYHR_NsDz41qD-UjM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

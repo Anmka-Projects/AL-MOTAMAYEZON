@@ -19,14 +19,14 @@ class VerifyOtpDataSourceImpl implements VerifyOtpDataSource {
   Future<Either<Failure, VerifyOtpModel?>> verifyOtp(
       String phone, String otp, bool isForgetPassword) async {
     try {
-      String token = await FirebaseMessaging.instance.getToken() ?? '';
+      final String token = await _safeGetFcmToken();
       final response = await _apiConsumer.post(
         isForgetPassword
             ? Endpoints.verifyOTPForgetPassword
             : Endpoints.verifyOTP,
         data: {
-          "email": phone,
-          "token": otp,
+          "email": phone.trim(),
+          "token": otp.trim(),
           "fcm_token": token,
         },
       );
@@ -53,6 +53,15 @@ class VerifyOtpDataSourceImpl implements VerifyOtpDataSource {
     } catch (e, stackTrace) {
       log("$stackTrace verify otp error ${e.toString()}");
       return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  Future<String> _safeGetFcmToken() async {
+    try {
+      return await FirebaseMessaging.instance.getToken() ?? '';
+    } catch (e, stackTrace) {
+      log("$stackTrace verify otp fcm error ${e.toString()}");
+      return '';
     }
   }
 }

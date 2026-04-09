@@ -23,6 +23,7 @@ class CustomVetricalList extends StatelessWidget {
 
     return ListView.builder(
       shrinkWrap: true,
+      padding: EdgeInsets.only(bottom: 24.h),
       itemCount: itemCount,
       itemBuilder: (context, i) {
         final index = i * 2;

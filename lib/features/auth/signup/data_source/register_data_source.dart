@@ -42,30 +42,32 @@ class RegisterDataSourceImpl implements RegisterDataSource {
     String? childCode,
   }) async {
     try {
-      String serialNumber = '';
-      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-      if (Platform.isAndroid) {
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        serialNumber = androidInfo.id;
-      } else if (Platform.isIOS) {
-        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        serialNumber = iosInfo.identifierForVendor ?? 'device not have id';
+      final String serialNumber = await _safeGetDeviceId();
+      final String normalizedChildCode = childCode?.trim() ?? '';
+      if (userType == "parent" && normalizedChildCode.isEmpty) {
+        return Left(
+          ValidationFailure(
+            message: 'Child code is required',
+            errors: const ['Child code is required'],
+          ),
+        );
       }
+
       FormData formData = FormData.fromMap({
-        "name": name,
-        "phone": phone,
-        "email": email,
-        "password": password,
-        "password_confirmation": passwordConfirmation,
+        "name": name.trim(),
+        "phone": phone.trim(),
+        "email": email.trim(),
+        "password": password.trim(),
+        "password_confirmation": passwordConfirmation.trim(),
         "user_type": userType,
         "stage_id": stageId,
         "grade_id": gradeId,
-        "birth_date": birthDate,
+        "birth_date": birthDate?.trim(),
         "device_id": serialNumber,
       });
 
       if (userType == "parent") {
-        formData.fields.add(MapEntry('code', childCode!));
+        formData.fields.add(MapEntry('code', normalizedChildCode));
       }
 
       if (imagePath != null) {
@@ -85,6 +87,25 @@ class RegisterDataSourceImpl implements RegisterDataSource {
     } catch (e, stackTrace) {
       log("$stackTrace login error ${e.toString()}");
       return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  Future<String> _safeGetDeviceId() async {
+    try {
+      const fallback = 'device_not_have_id';
+      final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        return androidInfo.id;
+      }
+      if (Platform.isIOS || Platform.isMacOS) {
+        final IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+        return iosInfo.identifierForVendor ?? fallback;
+      }
+      return fallback;
+    } catch (e, stackTrace) {
+      log("$stackTrace device id error ${e.toString()}");
+      return 'device_not_have_id';
     }
   }
 }

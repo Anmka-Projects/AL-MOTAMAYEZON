@@ -69,7 +69,11 @@ Future<void> initAppModule() async {
 
   // api consumer
   instance.registerLazySingleton<ApiConsumer>(
-      () => BaseApiConsumer(dio: instance()));
+      () => BaseApiConsumer(
+            dio: instance(),
+            maxRetries: 2,
+            retryDelay: const Duration(seconds: 1),
+          ));
 
   // data source
   instance.registerLazySingleton<GenericDataSource>(

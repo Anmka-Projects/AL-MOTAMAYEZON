@@ -43,11 +43,25 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
   late SearchCubit _searchCubit;
+  final CoursesCubit _subjectsCubit = instance<CoursesCubit>();
+  final CoursesCubit _booksCubit = instance<CoursesCubit>();
+  final CoursesCubit _freeLessonsCubit = instance<CoursesCubit>();
+
+  @override
+  void initState() {
+    super.initState();
+    _subjectsCubit.loadFirstCoursesPage();
+    _booksCubit.loadFirstCoursesPage(isBooks: true);
+    _freeLessonsCubit.loadFirstCoursesPage(isFreeLesson: true);
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
+    _subjectsCubit.close();
+    _booksCubit.close();
+    _freeLessonsCubit.close();
     super.dispose();
   }
 
@@ -59,11 +73,14 @@ class _HomeScreenState extends State<HomeScreen> {
     builder: (context) {
       _searchCubit = context.read<SearchCubit>();
       return Scaffold(
-          body: SingleChildScrollView(
-            padding: EdgeInsets.only(top: 60.h, bottom: 20.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+          body: RefreshIndicator(
+            onRefresh: _refreshHomeData,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(top: 60.h, bottom: 20.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
 
                 /// header
                 const HomeHeader(),
@@ -103,13 +120,24 @@ class _HomeScreenState extends State<HomeScreen> {
                       SearchWidgets(searchCubit: _searchCubit,),
                   ],
                 )
-              ],
+                ],
+              ),
             ),
           ),
-        );
+      );
     }
   ),
 );
+  }
+
+  Future<void> _refreshHomeData() async {
+    await Future.wait([
+      _subjectsCubit.loadFirstCoursesPage(),
+      _booksCubit.loadFirstCoursesPage(isBooks: true),
+      _freeLessonsCubit.loadFirstCoursesPage(isFreeLesson: true),
+      if (_searchController.text.trim().isNotEmpty)
+        _searchCubit.loadFirstSearchPage(text: _searchController.text.trim()),
+    ]);
   }
 
   _searchBar() {
@@ -133,11 +161,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onChanged: (value) {
           if (_debounce?.isActive ?? false) _debounce!.cancel();
           _debounce = Timer(const Duration(milliseconds: 800), () {
+            if (!mounted) return;
             if (value.isNotEmpty) {
               _searchCubit.loadFirstSearchPage(text: value);
-
-            }else{
-              _searchCubit.state.items.clear();
             }
             setState(() {});
           });
@@ -163,36 +189,34 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         Gap(15.h),
-        BlocProvider(
-          create: (context) => instance<CoursesCubit>()..loadFirstCoursesPage(),
-          child: BlocBuilder<CoursesCubit, BaseState<CourseModel>>(
-            builder: (context, state) {
-              if (state.status == Status.loading) {
-                return const CustomListRowShimmer();
-              }
-              if (state.status == Status.failure) {
-                return DefaultErrorWidget(errorMessage: state.errorMessage ?? '');
-              }
-              if (state.items.isEmpty) {
-                return DefaultErrorWidget(errorMessage: AppStrings.noData.tr());
-              }
-              return CustomWidgetList(
-                list: state.items,
-                child: (index) => GestureDetector(
-                  onTap: () {
-                    AppFunctions.navigateTo(
-                      context,
-                      Details(id: "${state.items[index].id}"),
-                    );
-                  },
-                  child: SubjectWidget(
-                    width: 150.w,
-                    subject: state.items[index],
-                  ),
+        BlocBuilder<CoursesCubit, BaseState<CourseModel>>(
+          bloc: _subjectsCubit,
+          builder: (context, state) {
+            if (state.status == Status.loading) {
+              return const CustomListRowShimmer();
+            }
+            if (state.status == Status.failure) {
+              return DefaultErrorWidget(errorMessage: state.errorMessage ?? '');
+            }
+            if (state.items.isEmpty) {
+              return DefaultErrorWidget(errorMessage: AppStrings.noData.tr());
+            }
+            return CustomWidgetList(
+              list: state.items,
+              child: (index) => GestureDetector(
+                onTap: () {
+                  AppFunctions.navigateTo(
+                    context,
+                    Details(id: "${state.items[index].id}"),
+                  );
+                },
+                child: SubjectWidget(
+                  width: 150.w,
+                  subject: state.items[index],
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -218,38 +242,33 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         Gap(16.h),
-        BlocProvider(
-          create: (context) =>
-              instance<CoursesCubit>()..loadFirstCoursesPage(isBooks: true),
-          child: BlocBuilder<CoursesCubit, BaseState<CourseModel>>(
-            builder: (context, state) {
-              if (state.status == Status.loading) {
-                return const CustomListRowShimmer();
-              }
-              if (state.status == Status.failure) {
-                return DefaultErrorWidget(
-                    errorMessage: state.errorMessage ?? '');
-              }
-              if (state.items.isEmpty) {
-                return DefaultErrorWidget(errorMessage: AppStrings.noData.tr());
-              }
-              return CustomWidgetList(
-                list: state.items,
-                child: (index) =>
-                    PopularBooksItem(popularBooks: state.items[index]),
-              );
-            },
-          ),
+        BlocBuilder<CoursesCubit, BaseState<CourseModel>>(
+          bloc: _booksCubit,
+          builder: (context, state) {
+            if (state.status == Status.loading) {
+              return const CustomListRowShimmer();
+            }
+            if (state.status == Status.failure) {
+              return DefaultErrorWidget(
+                  errorMessage: state.errorMessage ?? '');
+            }
+            if (state.items.isEmpty) {
+              return DefaultErrorWidget(errorMessage: AppStrings.noData.tr());
+            }
+            return CustomWidgetList(
+              list: state.items,
+              child: (index) =>
+                  PopularBooksItem(popularBooks: state.items[index]),
+            );
+          },
         ),
       ],
     );
   }
 
   _freeLessons() {
-    return BlocProvider(
-      create: (context) =>
-          instance<CoursesCubit>()..loadFirstCoursesPage(isFreeLesson: true),
-      child: BlocConsumer<CoursesCubit, BaseState<CourseModel>>(
+    return BlocConsumer<CoursesCubit, BaseState<CourseModel>>(
+      bloc: _freeLessonsCubit,
         listener: (context, state) {
           if (state.status == Status.failure) {
             AppFunctions.showsToast(state.errorMessage ?? 'An error occurred',
@@ -305,7 +324,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           );
         },
-      ),
-    );
+      );
   }
 }

@@ -42,7 +42,7 @@ class CoursesDataSourceImpl implements CoursesDataSource {
     bool isSearch = false,
   }) async {
     try {
-      return await _genericDataSource.fetchData<CourseModel>(
+      final result = await _genericDataSource.fetchData<CourseModel>(
         endpoint: isBooks
             ? Endpoints.books
             : isFreeLesson
@@ -65,6 +65,21 @@ class CoursesDataSourceImpl implements CoursesDataSource {
             : inProgress || isCompleted
                 ? {"status": status}
                 : null,
+      );
+      return result.fold(
+        (failure) {
+          final String message = failure.message.toLowerCase();
+          // Backend may return 404 with "no-*-found" when the list is empty.
+          // Treat this as an empty successful response instead of a hard error.
+          if (message.contains('no-books-found') ||
+              message.contains('no-courses-found') ||
+              message.contains('no-free-lessons-found') ||
+              message.contains('no-favorites-found')) {
+            return Right(<CourseModel>[]);
+          }
+          return Left(failure);
+        },
+        (items) => Right(items),
       );
     } catch (e, stackTrace) {
       log("Courses error: ${e.runtimeType} - ${e.toString()}",

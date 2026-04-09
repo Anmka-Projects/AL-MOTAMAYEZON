@@ -97,6 +97,8 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^31.1.19
   device_info_plus: 
   flutter_tts: ^3.8.3
+  flutter_inappwebview: ^6.1.5
+  syncfusion_flutter_core: ^31.2.18
 
 
 

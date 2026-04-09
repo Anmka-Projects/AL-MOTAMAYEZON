@@ -19,10 +19,15 @@ class PaginationHandler<T, B extends BlocBase<BaseState<T>>> {
     this.cacheKey,
     this.pageSize = 15,
   });
+
+  void _safeEmit(BaseState<T> state) {
+    if (bloc.isClosed) return;
+    (bloc as dynamic).emit(state);
+  }
   // final _cache = getIt<IPaginatedCache<T>>();
   Future<void> loadFirstPage(PaginateFunc<T> fetchFunction,
       {Map<String, dynamic>? params, String? cacheKey}) async {
-    bloc.emit(bloc.state.copyWith(status: Status.loading));
+    _safeEmit(bloc.state.copyWith(status: Status.loading));
     items.clear();
     currentPage = 1;
     isLoadingMore = false;
@@ -30,7 +35,7 @@ class PaginationHandler<T, B extends BlocBase<BaseState<T>>> {
 
     final result = await fetchFunction(currentPage, pageSize, params);
     await result.fold((failure) async {
-      bloc.emit(bloc.state
+      _safeEmit(bloc.state
           .copyWith(status: Status.failure, errorMessage: failure.message));
       return Left(failure);
       // On failure, load from cache
@@ -54,7 +59,7 @@ class PaginationHandler<T, B extends BlocBase<BaseState<T>>> {
       } else {
         hasMoreData = false;
       }
-      bloc.emit(
+      _safeEmit(
           bloc.state.copyWith(status: Status.success, items: List<T>.from(items)));
     });
   }
@@ -69,7 +74,7 @@ class PaginationHandler<T, B extends BlocBase<BaseState<T>>> {
 
     isLoadingMore = true;
     if (currentPage > 1) {
-      bloc.emit(bloc.state.copyWith(status: Status.isLoadingMore));
+      _safeEmit(bloc.state.copyWith(status: Status.isLoadingMore));
     }
 
     final result = await fetchFunction(currentPage, pageSize,
@@ -77,7 +82,7 @@ class PaginationHandler<T, B extends BlocBase<BaseState<T>>> {
     await result.fold(
           (failure) async {
         isLoadingMore = false;
-        bloc.emit(bloc.state
+        _safeEmit(bloc.state
             .copyWith(status: Status.failure, errorMessage: failure.message));
       },
           (data) async {
@@ -90,7 +95,7 @@ class PaginationHandler<T, B extends BlocBase<BaseState<T>>> {
           log('No more data to load');
         }
         isLoadingMore = false;
-        bloc.emit(bloc.state
+        _safeEmit(bloc.state
             .copyWith(status: Status.success, items: List<T>.from(items)));
       },
     );

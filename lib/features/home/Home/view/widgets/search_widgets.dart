@@ -28,7 +28,7 @@ class _SearchWidgetsState extends State<SearchWidgets> {
   Widget build(BuildContext context) {
     return Container(
       width: MediaQuery.sizeOf(context).width,
-      height: MediaQuery.sizeOf(context).height*.8,
+      height: MediaQuery.sizeOf(context).height,
       color: ColorManager.white,
       child: BlocProvider.value(
         value: widget.searchCubit!,

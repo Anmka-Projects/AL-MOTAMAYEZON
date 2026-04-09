@@ -9,12 +9,15 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 class DigitalPaymentView extends StatefulWidget {
   final String url;
   final bool isBook;
-  const DigitalPaymentView({super.key, required this.url, this.isBook = false,});
+  const DigitalPaymentView({
+    super.key,
+    required this.url,
+    this.isBook = false,
+  });
 
   @override
   DigitalPaymentViewState createState() => DigitalPaymentViewState();
@@ -24,7 +27,6 @@ class DigitalPaymentViewState extends State<DigitalPaymentView> {
   String? selectedUrl;
   double value = 0.0;
 
-  late WebViewController controllerGlobal;
   PullToRefreshController? pullToRefreshController;
   late MyInAppBrowser browser;
 
@@ -36,14 +38,33 @@ class DigitalPaymentViewState extends State<DigitalPaymentView> {
   }
 
   void _initData() async {
-    browser = MyInAppBrowser(context,widget.isBook);
-    if(Platform.isAndroid){
+    final String cleanedUrl = (selectedUrl ?? '').trim();
+    final Uri? parsedUri = Uri.tryParse(cleanedUrl);
+    final bool isValidUrl = parsedUri != null &&
+        parsedUri.hasScheme &&
+        (parsedUri.scheme == 'http' || parsedUri.scheme == 'https') &&
+        (parsedUri.host.isNotEmpty);
+
+    if (!isValidUrl) {
+      if (!mounted) return;
+      AppFunctions.showsToast(
+          AppStrings.unKnownError.tr(), ColorManager.red, context);
+      AppFunctions.navigateToAndFinish(context, const BottomNavBarView());
+      return;
+    }
+
+    browser = MyInAppBrowser(context, widget.isBook);
+    if (Platform.isAndroid) {
       await InAppWebViewController.setWebContentsDebuggingEnabled(true);
-      bool swAvailable = await WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_BASIC_USAGE);
-      bool swInterceptAvailable = await WebViewFeature.isFeatureSupported(WebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST);
+      bool swAvailable = await WebViewFeature.isFeatureSupported(
+          WebViewFeature.SERVICE_WORKER_BASIC_USAGE);
+      bool swInterceptAvailable = await WebViewFeature.isFeatureSupported(
+          WebViewFeature.SERVICE_WORKER_SHOULD_INTERCEPT_REQUEST);
       if (swAvailable && swInterceptAvailable) {
-        ServiceWorkerController serviceWorkerController = ServiceWorkerController.instance();
-        await serviceWorkerController.setServiceWorkerClient(ServiceWorkerClient(
+        ServiceWorkerController serviceWorkerController =
+            ServiceWorkerController.instance();
+        await serviceWorkerController
+            .setServiceWorkerClient(ServiceWorkerClient(
           shouldInterceptRequest: (request) async {
             if (kDebugMode) {
               print(request);
@@ -54,41 +75,42 @@ class DigitalPaymentViewState extends State<DigitalPaymentView> {
       }
     }
     await browser.openUrlRequest(
-        urlRequest: URLRequest(url: WebUri(selectedUrl??'')),
+        urlRequest: URLRequest(url: WebUri(cleanedUrl)),
         settings: InAppBrowserClassSettings(
-            webViewSettings: InAppWebViewSettings(useShouldOverrideUrlLoading: true, useOnLoadResource: true),
-            browserSettings: InAppBrowserSettings(hideUrlBar: true, hideToolbarTop: Platform.isAndroid)));
+            webViewSettings: InAppWebViewSettings(
+                useShouldOverrideUrlLoading: true, useOnLoadResource: true),
+            browserSettings: InAppBrowserSettings(
+                hideUrlBar: true, hideToolbarTop: Platform.isAndroid)));
   }
-
-
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(canPop: false,
+    return PopScope(
+      canPop: false,
       onPopInvoked: (val) => _exitApp(context),
       child: const Scaffold(),
     );
   }
 
   Future<bool> _exitApp(BuildContext context) async {
-    if (await controllerGlobal.canGoBack()) {
-      controllerGlobal.goBack();
-      return Future.value(false);
-    } else {
-      AppFunctions.navigateToAndFinish(context, const BottomNavBarView());
-      AppFunctions.showsToast(AppStrings.paymentCanceled.tr(), ColorManager.red, context);
-      return Future.value(true);
-    }
+    try {
+      await browser.close();
+    } catch (_) {}
+    if (!mounted) return Future.value(true);
+    AppFunctions.navigateToAndFinish(context, const BottomNavBarView());
+    AppFunctions.showsToast(
+        AppStrings.paymentCanceled.tr(), ColorManager.red, context);
+    return Future.value(true);
   }
 }
-
-
 
 class MyInAppBrowser extends InAppBrowser {
   final bool isBook;
   final BuildContext context;
 
-  MyInAppBrowser(this.context, this.isBook, {
+  MyInAppBrowser(
+    this.context,
+    this.isBook, {
     super.windowId,
     super.initialUserScripts,
   });
@@ -139,9 +161,10 @@ class MyInAppBrowser extends InAppBrowser {
 
   @override
   void onExit() {
-    if(_canRedirect) {
+    if (_canRedirect) {
       AppFunctions.navigateToAndFinish(context, const BottomNavBarView());
-      AppFunctions.showsToast(AppStrings.paymentFailed.tr(), ColorManager.red, context);
+      AppFunctions.showsToast(
+          AppStrings.paymentFailed.tr(), ColorManager.red, context);
     }
 
     if (kDebugMode) {
@@ -150,7 +173,8 @@ class MyInAppBrowser extends InAppBrowser {
   }
 
   @override
-  Future<NavigationActionPolicy> shouldOverrideUrlLoading(navigationAction) async {
+  Future<NavigationActionPolicy> shouldOverrideUrlLoading(
+      navigationAction) async {
     if (kDebugMode) {
       print("\n\nOverride ${navigationAction.request.url}\n\n");
     }
@@ -158,8 +182,7 @@ class MyInAppBrowser extends InAppBrowser {
   }
 
   @override
-  void onLoadResource(resource) {
-  }
+  void onLoadResource(resource) {}
 
   @override
   void onConsoleMessage(consoleMessage) {
@@ -173,32 +196,70 @@ class MyInAppBrowser extends InAppBrowser {
   }
 
   void _pageRedirect(String url) {
+    if (_canRedirect) {
+      final Uri? parsedUrl = Uri.tryParse(url);
+      final Uri? appBase = Uri.tryParse(AppConstants.baseUrl);
 
-    if(_canRedirect) {
-      bool isSuccess = url.contains('success=true') && url.contains(AppConstants.baseUrl);
-      bool isFailed = url.contains('success=false') && url.contains(AppConstants.baseUrl);
-      bool isCancel = url.contains('success=cancel') && url.contains(AppConstants.baseUrl);
-      if(isSuccess || isFailed || isCancel) {
+      final bool isAppDomainRedirect = parsedUrl != null &&
+          appBase != null &&
+          parsedUrl.host == appBase.host;
+
+      final Map<String, String> params = parsedUrl?.queryParameters ?? {};
+      final String successParam = (params['success'] ?? '').toLowerCase();
+      final String statusParam = (params['status'] ?? '').toLowerCase();
+      final String paymentStatusParam =
+          (params['payment_status'] ?? '').toLowerCase();
+
+      final bool isSuccess = isAppDomainRedirect &&
+          (successParam == 'true' ||
+              successParam == '1' ||
+              statusParam == 'success' ||
+              statusParam == 'paid' ||
+              paymentStatusParam == 'success' ||
+              paymentStatusParam == 'paid');
+
+      final bool isFailed = isAppDomainRedirect &&
+          (successParam == 'false' ||
+              successParam == '0' ||
+              statusParam == 'failed' ||
+              statusParam == 'failure' ||
+              paymentStatusParam == 'failed' ||
+              paymentStatusParam == 'failure');
+
+      final bool isCancel = isAppDomainRedirect &&
+          (successParam == 'cancel' ||
+              successParam == 'cancelled' ||
+              statusParam == 'cancel' ||
+              statusParam == 'cancelled' ||
+              paymentStatusParam == 'cancel' ||
+              paymentStatusParam == 'cancelled');
+
+      if (isSuccess || isFailed || isCancel) {
         _canRedirect = false;
         Future.delayed(const Duration(seconds: 1), () {
-          if(isSuccess){
-            AppFunctions.navigateToAndFinish(context, BottomNavBarView(pageIndex: isBook ? 3 : 0,));
+          if (isSuccess) {
+            AppFunctions.navigateToAndFinish(
+                context,
+                BottomNavBarView(
+                  pageIndex: isBook ? 3 : 0,
+                ));
 
-            AppFunctions.showsToast(AppStrings.paymentSuccess.tr(), ColorManager.successGreen, context);
-          }else if(isFailed) {
+            AppFunctions.showsToast(AppStrings.paymentSuccess.tr(),
+                ColorManager.successGreen, context);
+          } else if (isFailed) {
             AppFunctions.navigateToAndFinish(context, const BottomNavBarView());
 
-            AppFunctions.showsToast(AppStrings.paymentFailed.tr(), ColorManager.red, context);
-          }else if(isCancel) {
+            AppFunctions.showsToast(
+                AppStrings.paymentFailed.tr(), ColorManager.red, context);
+          } else if (isCancel) {
             AppFunctions.navigateToAndFinish(context, const BottomNavBarView());
 
-            AppFunctions.showsToast(AppStrings.paymentCanceled.tr(), ColorManager.red, context);
+            AppFunctions.showsToast(
+                AppStrings.paymentCanceled.tr(), ColorManager.red, context);
           }
           close();
         });
-
       }
     }
-
   }
 }

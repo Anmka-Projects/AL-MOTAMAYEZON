@@ -22,21 +22,13 @@ class LoginDataSourceImpl implements LoginDataSource {
   @override
   Future<Either<Failure, void>> login(String email, String password) async {
     try {
-      String serialNumber = 'device not have id';
-      DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-      if (Platform.isAndroid) {
-        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
-        serialNumber = androidInfo.id;
-      } else if (Platform.isIOS || Platform.isMacOS) {
-        IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
-        serialNumber = iosInfo.identifierForVendor??'device not have id';
-      }
-      String fcmToken = await FirebaseMessaging.instance.getToken() ?? "";
+      final String serialNumber = await _safeGetDeviceId();
+      final String fcmToken = await _safeGetFcmToken();
       final result = await _apiConsumer.post(
         Endpoints.login,
         data: {
-          "email": email,
-          "password": password,
+          "email": email.trim(),
+          "password": password.trim(),
           "fcm_token": fcmToken,
           "device_id": serialNumber,
         },
@@ -60,6 +52,34 @@ class LoginDataSourceImpl implements LoginDataSource {
     } catch (e, stackTrace) {
       log("$stackTrace login error ${e.toString()}");
       return Left(ServerFailure(message: AppStrings.unKnownError.tr()));
+    }
+  }
+
+  Future<String> _safeGetDeviceId() async {
+    try {
+      const fallback = 'device_not_have_id';
+      final DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+      if (Platform.isAndroid) {
+        final AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        return androidInfo.id;
+      }
+      if (Platform.isIOS || Platform.isMacOS) {
+        final IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
+        return iosInfo.identifierForVendor ?? fallback;
+      }
+      return fallback;
+    } catch (e, stackTrace) {
+      log("$stackTrace device id error ${e.toString()}");
+      return 'device_not_have_id';
+    }
+  }
+
+  Future<String> _safeGetFcmToken() async {
+    try {
+      return await FirebaseMessaging.instance.getToken() ?? "";
+    } catch (e, stackTrace) {
+      log("$stackTrace fcm token error ${e.toString()}");
+      return "";
     }
   }
 }

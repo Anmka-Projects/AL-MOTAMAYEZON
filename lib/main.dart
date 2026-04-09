@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:elmotamizon/app/imports.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -15,6 +16,24 @@ final _configurations =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterError.onError = (FlutterErrorDetails details) {
+    final exceptionText = details.exceptionAsString();
+    if (exceptionText
+        .contains('Bad state: Cannot emit new states after calling close')) {
+      return;
+    }
+    FlutterError.presentError(details);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    if (error
+        .toString()
+        .contains('Bad state: Cannot emit new states after calling close')) {
+      return true;
+    }
+    return false;
+  };
+
   await ScreenProtector.preventScreenshotOn();
   await Purchases.configure(_configurations);
 

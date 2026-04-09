@@ -1,6 +1,6 @@
-import 'package:elmotamizon/common/resources/color_manager.dart';
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:elmotamizon/app/app_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -9,24 +9,41 @@ GlobalMethods globalMethods = GlobalMethods();
 class GlobalMethods {
   final FirebaseMessaging firebaseMessaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  bool _isRegisteringNotification = false;
+  bool _isNotificationRegistered = false;
+  Future<void>? _permissionFuture;
 
 
-  void registerNotification(context) {
-
-    firebaseMessaging.requestPermission();
-
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-        configureLocalNotifications(message, context);
-        showLocalNotification(message.notification ?? const RemoteNotification());
-    });
-
-    firebaseMessaging.getToken().then((token) {
-      if (token != null) {
-        debugPrint('token ================================> $token');
+  Future<void> registerNotification(context) async {
+    if (_isNotificationRegistered) return;
+    if (_isRegisteringNotification) return;
+    _isRegisteringNotification = true;
+    try {
+      _permissionFuture ??= firebaseMessaging.requestPermission();
+      try {
+        await _permissionFuture;
+      } catch (e) {
+        debugPrint('Firebase permission request failed: $e');
+      } finally {
+        _permissionFuture = null;
       }
-    }).catchError((error) {
-      // AppFunctions.showsToast(error.toString(), ColorManager.red, context);
-    });
+
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+          configureLocalNotifications(message, context);
+          showLocalNotification(message.notification ?? const RemoteNotification());
+      });
+
+      firebaseMessaging.getToken().then((token) {
+        if (token != null) {
+          debugPrint('token ================================> $token');
+        }
+      }).catchError((error) {
+        // AppFunctions.showsToast(error.toString(), ColorManager.red, context);
+      });
+      _isNotificationRegistered = true;
+    } finally {
+      _isRegisteringNotification = false;
+    }
   }
 
   void configureLocalNotifications(RemoteMessage message, context) {
@@ -55,14 +72,16 @@ class GlobalMethods {
         const AndroidNotificationDetails(
       "com.services.fixman",
       "fixman",
-      playSound: true,
+      playSound: false,
       enableVibration: true,
       importance: Importance.max,
       priority: Priority.high,
     );
 
     DarwinNotificationDetails iOSNotificationDetails =
-        const DarwinNotificationDetails();
+        const DarwinNotificationDetails(
+      presentSound: false,
+    );
 
     NotificationDetails notificationDetails = NotificationDetails(
       android: androidNotificationDetails,

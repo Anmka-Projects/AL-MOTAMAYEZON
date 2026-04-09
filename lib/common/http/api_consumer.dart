@@ -98,16 +98,16 @@ final class BaseApiConsumer implements ApiConsumer {
 
   BaseApiConsumer({
     required Dio dio,
-    int maxRetries = 0,
-    Duration retryDelay = const Duration(seconds: 2),
+    int maxRetries = 2,
+    Duration retryDelay = const Duration(seconds: 1),
   })  : _dio = dio,
-        maxRetries = 0,
-        retryDelay = const Duration(seconds: 2);
+        maxRetries = maxRetries,
+        retryDelay = retryDelay;
 
   @override
   Future<Either<Failure, Map<String, dynamic>>> retryApiCall(
     Future<Either<Failure, Map<String, dynamic>>> Function() apiCall, {
-    int retryCount = 2,
+    int retryCount = 0,
   }) async {
     final result = await apiCall();
     return result.fold(
@@ -117,7 +117,9 @@ final class BaseApiConsumer implements ApiConsumer {
           await Future.delayed(retryDelay);
           return retryApiCall(apiCall, retryCount: retryCount + 1); //recursion
         } else {
-          log("Max retries reached, API failed: ${failure.message}");
+          if (!_isNoDataFailureMessage(failure.message)) {
+            log("Max retries reached, API failed: ${failure.message}");
+          }
           return Left(failure);
         }
       },
@@ -148,7 +150,9 @@ final class BaseApiConsumer implements ApiConsumer {
         return Right<Failure, Map<String, dynamic>>(
             response.data as Map<String, dynamic>);
       } on DioException catch (e) {
-        log(e.toString());
+        if (!_isNoDataNotFoundError(e)) {
+          log(e.toString());
+        }
         final failure = _handleDioError(e);
         return Left<Failure, Map<String, dynamic>>(failure);
       } catch (e) {
@@ -465,5 +469,30 @@ final class BaseApiConsumer implements ApiConsumer {
       case DioExceptionType.unknown:
         return UnknownFailure(message: AppStrings.unKnownError.tr());
     }
+  }
+
+  bool _isNoDataFailureMessage(String message) {
+    final normalized = message.toLowerCase();
+    return normalized.contains('no-books-found') ||
+        normalized.contains('no-courses-found') ||
+        normalized.contains('no-favorites-found') ||
+        normalized.contains('no-free-lessons-found');
+  }
+
+  bool _isNoDataNotFoundError(DioException error) {
+    if (error.response?.statusCode != 404) return false;
+    final data = error.response?.data;
+    String message = '';
+    if (data is Map<String, dynamic>) {
+      message = (data['message'] ?? '').toString();
+    } else if (data is String) {
+      try {
+        final decoded = json.decode(data);
+        if (decoded is Map<String, dynamic>) {
+          message = (decoded['message'] ?? '').toString();
+        }
+      } catch (_) {}
+    }
+    return _isNoDataFailureMessage(message);
   }
 }

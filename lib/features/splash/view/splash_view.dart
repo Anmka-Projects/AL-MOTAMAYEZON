@@ -28,7 +28,7 @@ class SplashView extends StatefulWidget {
 class _SplashViewState extends State<SplashView> {
   final AppPreferences _appPreferences = instance<AppPreferences>();
   final ScreenCaptureEvent screenListener = ScreenCaptureEvent();
-  late Timer _timer;
+  Timer? _timer;
 
   _checkScreenRecord() async {
     screenListener.addScreenRecordListener((recorded) {
@@ -86,17 +86,25 @@ class _SplashViewState extends State<SplashView> {
   void initState() {
     super.initState();
     language = instance<AppPreferences>().getAppLanguage();
-    globalMethods.registerNotification(context);
-    setupInteractedMessage();
+    try {
+      globalMethods.registerNotification(context);
+    } catch (_) {}
+    try {
+      setupInteractedMessage();
+    } catch (_) {}
     _startDelay();
     // FlutterPreventScreenshot.instance.screenshotOff();
-    _checkScreenRecord();
-    _isRecordingCheck();
+    try {
+      _checkScreenRecord();
+      _isRecordingCheck();
+    } catch (_) {}
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       try {
         FirebaseMessaging.instance.subscribeToTopic('elmotamizon');
       } catch (e) {
-        AppFunctions.showsToast(e.toString(), ColorManager.red, context);
+        if (mounted) {
+          AppFunctions.showsToast(e.toString(), ColorManager.red, context);
+        }
       }
     });
   }
@@ -104,7 +112,7 @@ class _SplashViewState extends State<SplashView> {
   @override
   void dispose() {
     super.dispose();
-    _timer.cancel();
+    _timer?.cancel();
   }
 
   @override

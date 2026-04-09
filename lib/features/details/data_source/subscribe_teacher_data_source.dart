@@ -31,11 +31,44 @@ class SubscribeTeacherDataSourceImpl implements SubscribeTeacherDataSource {
         }
       );
       return result.fold((l) => Left(l), (r){
-        return Right(r['payment_url']??'');
+        final String paymentUrl = _extractPaymentUrl(r);
+        if (paymentUrl.isEmpty &&
+            !(instance<AppPreferences>().getUserIsAppleReview() == 1 &&
+                !isBook)) {
+          return Left(
+            ServerFailure(
+              message: (r['message']?.toString().trim().isNotEmpty ?? false)
+                  ? r['message'].toString().trim()
+                  : 'Payment link is not available right now',
+            ),
+          );
+        }
+        return Right(paymentUrl);
       });
     }catch(e,stackTrace){
       log("$stackTrace login error ${e.toString()}");
       return Left(ServerFailure(message: e.toString()));
     }
+  }
+
+  String _extractPaymentUrl(Map<String, dynamic> response) {
+    String from(dynamic value) => value?.toString().trim() ?? '';
+
+    final direct = from(response['payment_url']);
+    if (direct.isNotEmpty) return direct;
+
+    final data = response['data'];
+    if (data is Map<String, dynamic>) {
+      final nestedPaymentUrl = from(data['payment_url']);
+      if (nestedPaymentUrl.isNotEmpty) return nestedPaymentUrl;
+
+      final nestedUrl = from(data['url']);
+      if (nestedUrl.isNotEmpty) return nestedUrl;
+    }
+
+    final topLevelUrl = from(response['url']);
+    if (topLevelUrl.isNotEmpty) return topLevelUrl;
+
+    return '';
   }
 }
