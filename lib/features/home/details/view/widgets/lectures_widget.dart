@@ -33,6 +33,36 @@ class LecturesWidget extends StatefulWidget {
 class _LecturesWidgetState extends State<LecturesWidget> {
   int? _selectedId;
 
+  List<LessonModel> _uniqueLessons(List<LessonModel> lessons) {
+    final Set<String> seenKeys = <String>{};
+    final List<LessonModel> unique = <LessonModel>[];
+
+    for (final lesson in lessons) {
+      final String keyById = lesson.id != null ? 'id:${lesson.id}' : '';
+      final String keyByVideo = (lesson.videoUrl ?? '').trim().isNotEmpty
+          ? 'video:${(lesson.videoUrl ?? '').trim()}'
+          : '';
+      final String keyByName = (lesson.name ?? '').trim().isNotEmpty
+          ? 'name:${(lesson.name ?? '').trim().toLowerCase()}'
+          : '';
+
+      final String key = keyById.isNotEmpty
+          ? keyById
+          : (keyByVideo.isNotEmpty ? keyByVideo : keyByName);
+      if (key.isEmpty) {
+        unique.add(lesson);
+        continue;
+      }
+
+      if (!seenKeys.contains(key)) {
+        seenKeys.add(key);
+        unique.add(lesson);
+      }
+    }
+
+    return unique;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -57,7 +87,7 @@ class _LecturesWidgetState extends State<LecturesWidget> {
               ),),
             );
           }
-          final lessonsList = state.items;
+          final lessonsList = _uniqueLessons(state.items);
           return Column(
             spacing: 10.h,
             crossAxisAlignment: CrossAxisAlignment.start,

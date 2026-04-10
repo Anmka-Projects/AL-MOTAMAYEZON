@@ -55,6 +55,7 @@ class _DetailsState extends State<Details> {
   bool isFullScreen = false;
   bool isVideoPlaying = false;
   bool _controlsVisible = true;
+  double _playbackSpeed = 1.0;
   String? _currentVideoUrl;
   String? _currentVideoTitle;
   String? _currentVideoId;
@@ -115,10 +116,18 @@ class _DetailsState extends State<Details> {
     _videoController?.dispose();
     _videoController = VideoPlayerController.networkUrl(Uri.parse(url));
     await _videoController!.initialize();
+    await _videoController!.setPlaybackSpeed(_playbackSpeed);
     await _videoController!.play();
     if (mounted) {
       setState(() {});
     }
+  }
+
+  String _speedLabel(double speed) {
+    if (speed == speed.toInt()) {
+      return '${speed.toInt()}x';
+    }
+    return '${speed}x';
   }
 
   @override
@@ -763,6 +772,50 @@ class _DetailsState extends State<Details> {
                                     Duration(seconds: v.toInt());
                                 _videoController!.seekTo(newPosition);
                               },
+                            ),
+                          ),
+                          PopupMenuButton<double>(
+                            initialValue: _playbackSpeed,
+                            color: Colors.black87,
+                            onSelected: (speed) async {
+                              _playbackSpeed = speed;
+                              await _videoController?.setPlaybackSpeed(speed);
+                              if (mounted) setState(() {});
+                            },
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                  value: 0.5,
+                                  child: Text('0.5x',
+                                      style: TextStyle(color: Colors.white))),
+                              PopupMenuItem(
+                                  value: 0.75,
+                                  child: Text('0.75x',
+                                      style: TextStyle(color: Colors.white))),
+                              PopupMenuItem(
+                                  value: 1.0,
+                                  child: Text('1x',
+                                      style: TextStyle(color: Colors.white))),
+                              PopupMenuItem(
+                                  value: 1.25,
+                                  child: Text('1.25x',
+                                      style: TextStyle(color: Colors.white))),
+                              PopupMenuItem(
+                                  value: 1.5,
+                                  child: Text('1.5x',
+                                      style: TextStyle(color: Colors.white))),
+                              PopupMenuItem(
+                                  value: 2.0,
+                                  child: Text('2x',
+                                      style: TextStyle(color: Colors.white))),
+                            ],
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                _speedLabel(_playbackSpeed),
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 12),
+                              ),
                             ),
                           ),
                           IconButton(
